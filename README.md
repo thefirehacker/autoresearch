@@ -18,44 +18,47 @@ By design, training runs for a **fixed 5-minute time budget** (wall clock, exclu
 
 If you are new to neural networks, this ["Dummy's Guide"](https://x.com/hooeem/status/2030720614752039185) looks pretty good for a lot more context.
 
-## Quick start
+## Quick start (Modal + H100 sandbox)
 
-**Requirements:** A single NVIDIA GPU (tested on H100), Python 3.10+, [uv](https://docs.astral.sh/uv/).
+This fork runs on [Modal](https://modal.com/) — no local GPU needed. Training runs in a persistent H100 sandbox that stays alive between experiments (no cold starts after the first run).
+
+**Requirements:** Python 3.10+, a [Modal](https://modal.com/) account.
 
 ```bash
+# 1. Install Modal and authenticate (one-time)
+pip install modal
+modal setup
 
-# 1. Install uv project manager (if you don't already have it)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# 2. Download data and train tokenizer on Modal (one-time, ~2 min)
+modal run modal_app.py::prepare
 
-# 2. Install dependencies
-uv sync
-
-# 3. Download data and train tokenizer (one-time, ~2 min)
-uv run prepare.py
-
-# 4. Manually run a single training experiment (~5 min)
-uv run train.py
+# 3. Run a single training experiment in the sandbox (~5 min)
+python run_experiment.py
 ```
 
-If the above commands all work ok, your setup is working and you can go into autonomous research mode.
+**How the sandbox works:** The first run creates an H100 container and saves its ID to `.sandbox_id`. Subsequent runs reuse the same container — no cold start, `torch.compile` cache preserved. The sandbox auto-terminates after 30 min idle or 6 hours max. To start fresh, delete `.sandbox_id` and run again.
+
+If the above commands work, you're ready for autonomous research mode.
 
 ## Running the agent
 
-Simply spin up your Claude/Codex or whatever you want in this repo (and disable all permissions), then you can prompt something like:
+Spin up Claude Code (or similar) in this repo, then prompt:
 
 ```
 Hi have a look at program.md and let's kick off a new experiment! let's do the setup first.
 ```
 
-The `program.md` file is essentially a super lightweight "skill".
+The agent runs each experiment with `python run_experiment.py > run.log 2>&1` — this syncs your local `train.py` into the Modal sandbox and streams output to `run.log`.
 
 ## Project structure
 
 ```
-prepare.py      — constants, data prep + runtime utilities (do not modify)
-train.py        — model, optimizer, training loop (agent modifies this)
-program.md      — agent instructions
-pyproject.toml  — dependencies
+prepare.py         — constants, data prep + runtime utilities (do not modify)
+train.py           — model, optimizer, training loop (agent modifies this)
+program.md         — agent instructions
+run_experiment.py  — sandbox runner: syncs code, runs on Modal H100
+modal_app.py       — Modal app (image, volumes, one-time prepare)
+pyproject.toml     — dependencies
 ```
 
 ## Design choices
@@ -66,7 +69,7 @@ pyproject.toml  — dependencies
 
 ## Platform support
 
-This code currently requires that you have a single NVIDIA GPU. In principle it is quite possible to support CPU, MPS and other platforms but this would also bloat the code. I'm not 100% sure that I want to take this on personally right now. People can reference (or have their agents reference) the full/parent nanochat repository that has wider platform support and shows the various solutions (e.g. a Flash Attention 3 kernels fallback implementation, generic device support, autodetection, etc.), feel free to create forks or discussions for other platforms and I'm happy to link to them here in the README in some new notable forks section or etc.
+This fork runs on Modal's cloud H100 GPUs — no local GPU required. The original autoresearch requires a single NVIDIA GPU for local runs. In principle it is quite possible to support CPU, MPS and other platforms but this would also bloat the code. I'm not 100% sure that I want to take this on personally right now. People can reference (or have their agents reference) the full/parent nanochat repository that has wider platform support and shows the various solutions (e.g. a Flash Attention 3 kernels fallback implementation, generic device support, autodetection, etc.), feel free to create forks or discussions for other platforms and I'm happy to link to them here in the README in some new notable forks section or etc.
 
 Seeing as there seems to be a lot of interest in tinkering with autoresearch on much smaller compute platforms than an H100, a few extra words. If you're going to try running autoresearch on smaller computers (Macbooks etc.), I'd recommend one of the forks below. On top of this, here are some recommendations for how to tune the defaults for much smaller models for aspiring forks:
 
