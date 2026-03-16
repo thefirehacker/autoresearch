@@ -19,5 +19,13 @@ AGENTS.md
 # Experimental code/artifacts
 dev/
 
+# Sandbox state (do not commit — contains Modal container ID)
+.sandbox_id
+
 # Results file
 results.tsv
+run.log
+
+# IDE
+.cursor/*
+.claude/*
